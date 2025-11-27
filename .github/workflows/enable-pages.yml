@@ -1,0 +1,39 @@
+name: Ensure GitHub Pages is enabled
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  enable-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure job
+        run: echo "Ensuring GitHub Pages is configured for gh-pages branch"
+
+      - name: Create/Update Pages site via REST API
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          owner=${GITHUB_REPO%%/*}
+          repo=${GITHUB_REPO##*/}
+          echo "Owner: $owner, Repo: $repo"
+          body=$(jq -n --arg branch "gh-pages" '{source: {branch: $branch, path: "/"}}')
+          echo "Request body: $body"
+          # Use GitHub REST API to create or update Pages site
+          resp=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -d "$body" \
+            "https://api.github.com/repos/$owner/$repo/pages")
+          echo "GitHub Pages API response code: $resp"
+          if [ "$resp" != "201" -a "$resp" != "202" -a "$resp" != "200" ]; then
+            echo "Pages API request did not return success status: $resp"
+            exit 1
+          fi
