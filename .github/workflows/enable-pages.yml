@@ -21,19 +21,23 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           owner=${GITHUB_REPO%%/*}
           repo=${GITHUB_REPO##*/}
           echo "Owner: $owner, Repo: $repo"
-          body=$(jq -n --arg branch "gh-pages" '{source: {branch: $branch, path: "/"}}')
+          body='{"source":{"branch":"gh-pages","path":"/"}}'
           echo "Request body: $body"
-          # Use GitHub REST API to create or update Pages site
-          resp=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+          # Use GitHub REST API to create or update Pages site; print response for debug
+          http_code=$(curl -sS -w "%{http_code}" -o /tmp/pages_resp.txt -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -d "$body" \
-            "https://api.github.com/repos/$owner/$repo/pages")
-          echo "GitHub Pages API response code: $resp"
-          if [ "$resp" != "201" -a "$resp" != "202" -a "$resp" != "200" ]; then
-            echo "Pages API request did not return success status: $resp"
+            "https://api.github.com/repos/$owner/$repo/pages") || true
+          echo "--- response body ---"
+          cat /tmp/pages_resp.txt || true
+          echo "--- end response ---"
+          echo "HTTP status: $http_code"
+          if [ "$http_code" != "201" -a "$http_code" != "202" -a "$http_code" != "200" ]; then
+            echo "Pages API request did not return success status: $http_code"
             exit 1
           fi
